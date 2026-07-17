@@ -1,4 +1,6 @@
 # to download the NCBI CDS for each accession in the file, run:
 datasets download virus genome accession --inputfile accession_codes.txt --include cds --filename all_cds.zip
-
+# Output files:
+# md5sum.txt, README.md and a directory: ncbi_dataset.
+# In ncbi_dataset/data/ there are 3 files: cds.fna, data_report.jsonl, dataset_catalog.json.
 
