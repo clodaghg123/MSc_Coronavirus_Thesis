@@ -1,0 +1,4 @@
+# to download the NCBI CDS for each accession in the file, run:
+datasets download virus genome accession --inputfile accession_codes.txt --include cds --filename all_cds.zip
+
+
