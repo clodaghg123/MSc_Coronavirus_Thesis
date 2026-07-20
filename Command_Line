@@ -1,0 +1,77 @@
+## 1. Download NCBI CDS
+# to download the NCBI CDS for each accession in the file, run:
+datasets download virus genome accession --inputfile accession_codes.txt --include cds --filename all_cds.zip
+# Output files:
+# md5sum.txt, README.md and a directory: ncbi_dataset.
+# In ncbi_dataset/data/ there are 3 files: cds.fna, data_report.jsonl, dataset_catalog.json.
+
+
+
+## 2. Extract fasta sequences
+# 1. in this directory, there are .txt files with the headers identified using grep.
+# 2. these have been used to generate fasta files (headers + sequences):
+for f in *.txt; do seqkit grep -n -f $f cds.fna -o fasta_outputs/$f.fa; done
+# 3. cleaned fastas:
+#The extra NC_006577.2 nucleocapsid sequence was just a truncated version of the first and was removed.
+#The stop codons were removed from the structural and NSP16 proteins:
+for f in str*; do seqkit subseq -r 1:-4 $f > trimmed_$f; done
+seqkit subseq -r 1:-4 nsp16.fa > trimmed_nsp16.fa
+# 4. the fourth directory has altered the fasta headers to be just accession codes and locations:
+sed '/^>/s/ .*//'
+# then just accessions:
+sed 's/^\(>[^:]*\):.*/\1/'
+# then add alpha, beta, gamma and delta with a tab-deliminated .txt file:
+for f in *.fa; do
+    awk 'NR==FNR { map[$1]=$2; next } /^>/ { acc=substr($1,2); print ">" map[acc] "_" acc; next } { print }' "$f" > ../3_abgd/"$f"
+done
+
+
+
+## 3. Extract NSPs
+# 1. nsp_sequences: the unaligned and aligned nucleotide files used to generate the nsp reference sequence.
+# 2. alignment: contains the nsp1-16 reference sequences, and this combined with the the orf1ab, 1a, and 1b
+	# in nucleotide (nt) and amino acid (aa) formats.
+# 3. extracted_nsps: contains the aligned and unaligned fasta files for the extracted nsp 1-10, 12-16.
+	# 1. raw_aligned_mafft includes the still-aligned extracted nucleotide sequences.
+	# 2. unaligned_cleaned contains the unaligned nucleotide sequences. Sequences have been processed:
+		# 1. Ns separating the different proteins in the reference sequences removed.
+			sed -i 's/N//g' nsp*
+		# 1. Add back Ns in accession codes:
+			sed -i 's/C_/NC_/g' nsp*
+		# 1. Undo the alignment made by removing "-":
+			sed -i 's/-//g' nsp*
+		# 2. Remove sequences with <80 nt:
+			for f in nsp*; do seqkit seq -m 80 $f > ../2_rm_empty_sequences/$f; done
+		# 3. Remove the reference NSPs:
+			for f in nsp*; do awk '/^>/ {keep = !/>R/} keep' $f > ../3_rm_references/$f; done
+
+
+
+##4. Align all sequences
+# 1. the unaligned nucleotide sequences
+	# 1. original format: across multiple lines.
+	# 2. oneline format: the nucleotide sequences were put into one line for readability.
+		for f in *.fas; do seqkit seq -w 0 $f > ../3_alphabetical_unaligned_nt_sequences/$f; done
+	# 3. alphabetically arranged: arranged alphabetically (by genus) for input into pal2nal.
+		for f in *.fas; do seqkit sort $f -o ../3_alphabetical_unaligned_nt_sequences/$f; done
+# 2. the unaligned amino acid sequences.
+	for f in *.fas; do seqkit translate $f ../../2_unaligned_aa_sequences/$f; done
+# 3. the aligned amino acid sequences.
+	for f in *.fas; do mafft --maxiterate 1000 --globalpair $f > ../3_ginsi_aa_sequences/1_original_output/$f; done
+	# 1. in the original output ordering
+	# 2. alphabetically arranged: arranged alphabetically (by genus) for input into pal2nal.
+		for f in *.fas; do seqkit sort $f -o ../2_alphabetical_ordering/$f; done
+# 4. the (1) unaligned nucleotides are mapped back to the (2) amino acid ginsi alignment in the (3) nucleotide alignment directory.
+	for f in *.fas; do pal2nal.pl "$f" "../1_nt_unaligned/$f" -output fasta > "../3_nt_aligned/$f"; done
+
+
+
+##5. DMP
+# 1. input sequences:
+	# the unaligned nsps and str nucleotide sequences in fasta format to be analysed.
+    for f in *.fas; do ./DMP $f 1; done
+# 2. dmp_output:
+	# the csv files outputted from DMP.
+# extra files:
+	# .Rmd file with the RStudio analysis (data loading, graphs etc)
+	# DMP software
